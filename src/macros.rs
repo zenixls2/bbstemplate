@@ -1,4 +1,7 @@
 #![allow(unused_macros)]
+#![allow(non_upper_case_globals)]
+
+pub const BACKSPACE: u8 = 8;
 
 macro_rules! rgb2ansi {
     ($r:tt, $b:tt, $g:tt) => {
@@ -9,14 +12,14 @@ macro_rules! rgb2ansi {
 macro_rules! u2a {
     ($u:tt, $a:tt) => {
         if $u >= 100 {
-            $a.push(($u / 100) % 10 + 48);
-            $a.push(($u / 10) % 10 + 48);
-            $a.push($u % 10 + 48);
+            $a.push((($u / 100) % 10 + 48) as u8);
+            $a.push((($u / 10) % 10 + 48) as u8);
+            $a.push(($u % 10 + 48) as u8);
         } else if $u >= 10 {
-            $a.push(($u / 10) % 10 + 48);
-            $a.push($u % 10 + 48);
+            $a.push((($u / 10) % 10 + 48) as u8);
+            $a.push(($u % 10 + 48) as u8);
         } else {
-            $a.push($u + 48);
+            $a.push(($u + 48) as u8);
         }
     }
 }
@@ -24,37 +27,22 @@ macro_rules! u2a {
 macro_rules! gen_command {
     ($name:ident, $arg:ident, $cap:tt, $code:tt) => {
         pub fn $name($arg: u16) -> Box<[u8]> {
-            let mut out = Vec::with_capacity($cap);
+            let mut out: Vec<u8> = Vec::with_capacity($cap);
             out.push(27);
             out.push(91);
-            let mut tmp = $arg;
-            while tmp >= 10 {
-                out.push( ((tmp % 10) + 48) as u8);
-                tmp /= 10;
-            }
-            out.push((tmp + 48) as u8);
+            u2a!($arg, out);
             out.push($code);
             return out.into_boxed_slice();
         }
     };
     ($name:ident, $arg1:ident, $arg2:ident, $cap:tt, $code:tt) => {
         pub fn $name($arg1: u16, $arg2: u16) -> Box<[u8]> {
-            let mut out = Vec::with_capacity($cap);
+            let mut out: Vec<u8> = Vec::with_capacity($cap);
             out.push(27);
             out.push(91);
-            let mut tmp = $arg1;
-            while tmp >= 10 {
-                out.push( ((tmp % 10) + 48) as u8);
-                tmp /= 10;
-            }
-            out.push((tmp + 48) as u8);
+            u2a!($arg1, out);
             out.push(59);
-            tmp = $arg2;
-            while tmp >= 10 {
-                out.push( ((tmp % 10) + 48) as u8);
-                tmp /= 10;
-            }
-            out.push((tmp + 48) as u8);
+            u2a!($arg2, out);
             out.push($code);
             return out.into_boxed_slice();
         }
@@ -508,29 +496,29 @@ macro_rules! clearTab {
 
 macro_rules! cursorUp {
     // Move cursor up one line
-    // \x1bA
-    () => {[27, 65]};
+    // \x1b[A
+    () => {[27, 91, 49, 65]};
 }
 
 
 macro_rules! cursorDown {
     // Move cursor down one line
-    // \x1bB
-    () => {[27, 66]};
+    // \x1b[1B
+    () => {[27, 91, 49, 66]};
 }
 
 
 macro_rules! cursorRight {
     // Move cursor right one char
-    // \x1bC
-    () => {[27, 67]};
+    // \x1b[1C
+    () => {[27, 91, 49, 67]};
 }
 
 
-macro_rules! curosrLeft {
+macro_rules! cursorLeft {
     // Move cursor left one char
-    // \x1bD
-    () => {[27, 68]};
+    // \x1b[1D
+    () => {[27, 91, 49, 68]};
 }
 
 

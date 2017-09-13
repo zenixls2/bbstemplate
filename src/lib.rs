@@ -17,7 +17,7 @@ use bytebuffer::{ByteBuffer};
 #[cfg(test)]
 mod tests {
     use test::Bencher;
-    use macros::*;
+    use super::*;
 
     #[bench]
     fn bench_colorbg(b: &mut Bencher) {
@@ -38,6 +38,28 @@ mod tests {
 
         imgcat(testb.as_bytes(), 12, 12);
         });
+    }
+
+    #[test]
+    fn text_box() {
+        let mut attr = TermAttr {cols: 76, lines: 82, cursor: [0, 0]};
+        let mut tbox = TextBox::new(1, 1, 12, 12);
+        for c in String::from("hello!World!hello!World!").into_bytes() {
+            tbox.listen(c);
+        }
+        for c in &[8 as u8; 15] {
+            tbox.listen(*c);
+        }
+        use std::io::{self, Write};
+        use std::ops::Deref;
+        loop {
+            let out = tbox.serialize(&mut attr);
+            if out.is_empty() {
+                break;
+            }
+            io::stdout().write(Box::deref(&out)).unwrap();
+        }
+        io::stdout().write(&tbox.buf).unwrap();
     }
 
     #[test]
@@ -73,73 +95,102 @@ impl Default for TermAttr {
 }
 
 trait Element {
-    fn serialize(&mut self, attr: TermAttr) -> Box<[u8]>;
+    fn serialize(&mut self, attr: &mut TermAttr) -> Box<[u8]>;
     fn position(&mut self) -> [u16; 2];
 }
 
 pub struct TextBox {
-    buf: Box<[u8]>,
-    length: usize,
-    x: u16,
-    y: u16,
-    width: usize,
-    height: usize,
+    pub buf: Vec<u8>,
+    pub x: u16,
+    pub y: u16,
+    pub width: usize,
+    pub height: usize,
+    pub cursorX: u16,
+    pub cursorY: u16,
     //color: TermColor,
     //fontColor: TermColor,
-    serialized: bool,
+    pub serialized: bool,
     outbuf: ByteBuffer,
 }
 
 
 impl TextBox {
+    pub fn new(x: u16, y: u16, width: usize, height: usize) -> TextBox {
+        return TextBox{
+            buf: Vec::new(),
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            cursorX: x,
+            cursorY: y,
+            serialized: false,
+            outbuf: ByteBuffer::new(),
+        };
+    }
     pub fn listen(&mut self, c: u8) {
         // TODO: Handle color
-        match c {
-            /*BACKSPACE => {
-                if self.length > 0 {
-                    self.length -= 1;
-                }
-            },*/
-            _ => {
-                if self.buf.len() > self.length {
-                    self.buf[self.length] = c;
-                    self.length += 1;
-                }
-            }
-        }
-        if !self.serialized {
-            self.serialized = true;
-            let mut i = 0;
-            loop {
-                if i >= self.buf.len() {
-                    break
-                }
-                for j in i..i + self.width {
-                    if j < self.length {
-                        self.outbuf.write_u8(self.buf[j]);
+        if self.cursorY + 1 - self.y <= self.height as u16 {
+            match c {
+                BACKSPACE => {
+                    if self.cursorX == self.x {
+                        if self.cursorY > self.y {
+                            self.cursorX = self.x + (self.width as u16) - 1;
+                            self.cursorY -= 1;
+                            self.outbuf.write_bytes(&cursorUp!());
+                            self.outbuf.write_bytes(&right!(
+                                    (self.width as u16)));
+                        } else {
+                            return;
+                        }
+                    } else {
+                        self.cursorX -= 1;
                     }
+                    self.buf.pop();
+                    self.outbuf.write_u8(c);
+                    self.outbuf.write_u8(32);
+                    self.outbuf.write_bytes(&cursorLeft!());
+                },
+                _ => {
+                    self.buf.push(c);
+                    if self.cursorX + 1 - self.x > self.width as u16 {
+                        self.cursorX -= self.width as u16;
+                        self.cursorY += 1;
+                        self.outbuf.write_bytes(&cursorDown!());
+                        self.outbuf.write_bytes(&left!((self.width as u16)));
+                    }
+                    self.cursorX += 1;
+                    self.outbuf.write_u8(c);
                 }
-                self.outbuf.write_bytes(&left!((self.width as u16)));
-                self.outbuf.write_bytes(&cursorDown!());
-                i += self.width;
-            }
-            self.outbuf.write_bytes(&move2!((self.x), (self.y)));
-        } else {
-            self.outbuf.write_u8(c);
-            if self.length % self.width == 0 {
-                self.outbuf.write_bytes(&left!((self.width as u16)));
-                self.outbuf.write_bytes(&cursorDown!());
             }
         }
     }
 }
 
+impl Iterator for TextBox {
+    type Item = Box<[u8]>;
+    fn next(&mut self) -> Option<Box<[u8]>> {
+        if !self.serialized {
+            self.serialized = true;
+            return Some(move2!((self.x+1), (self.y+1)));
+        }
+        let mut output = Vec::with_capacity(self.outbuf.len());
+        loop {
+            if self.outbuf.get_rpos() >= self.outbuf.len() {
+                break;
+            }
+            output.push(self.outbuf.read_u8());
+        }
+        return Some(output.into_boxed_slice());
+    }
+}
+
 impl Element for TextBox {
-    fn serialize(&mut self, attr: TermAttr) -> Box<[u8]> {
-        return Box::new([3]);
+    fn serialize(&mut self, _attr: &mut TermAttr) -> Box<[u8]> {
+        return self.next().unwrap();
     }
     fn position(&mut self) -> [u16; 2] {
-        return [0, 0];
+        return [self.x, self.y];
     }
 }
 
