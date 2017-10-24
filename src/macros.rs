@@ -216,6 +216,65 @@ pub fn imgcat(img: &[u8], width: u8, height: u8) -> Box<[u8]> {
     return out.into_boxed_slice();
 }
 
+// The osc 8 link support
+pub fn link(url: &[u8], description: &[u8]) -> Box<[u8]> {
+    let mut out: Vec<u8> = Vec::with_capacity(12 + url.len() + description.len());
+    out.push(27);
+    out.push(93);
+    out.push(56);
+    out.push(59);
+    out.push(59);
+    out.extend_from_slice(url);
+    out.push(7);
+    out.extend_from_slice(description);
+    out.push(27);
+    out.push(93);
+    out.push(59);
+    out.push(59);
+    out.push(7);
+    return out.into_boxed_slice();
+}
+
+// Add annotation to text, only in iterm2
+pub fn annotation(description: &[u8], text: &[u8]) -> Box<[u8]> {
+    let len: usize = text.len() as usize;
+    let mut out: Vec<u8> = Vec::with_capacity(23 + ((len as f32).log10() as usize) + len + description.len());
+    out.push(27);
+    out.push(93);
+    out.push(49);
+    out.push(51);
+    out.push(51);
+    out.push(55);
+    out.push(59);
+    out.push(65);
+    out.push(100);
+    out.push(100);
+    out.push(65);
+    out.push(110);
+    out.push(110);
+    out.push(111);
+    out.push(116);
+    out.push(97);
+    out.push(116);
+    out.push(105);
+    out.push(111);
+    out.push(110);
+    out.push(61);
+    u2a!(len, out);
+    out.push(124);
+    out.extend_from_slice(description);
+    out.push(7);
+    out.push(27);
+    out.push(93);
+    out.push(49);
+    out.push(51);
+    out.push(51);
+    out.push(55);
+    out.push(59);
+    out.extend_from_slice(text);
+    return out.into_boxed_slice();
+}
+
 
 macro_rules! reverseVideo {
     // \x1b[?5h
