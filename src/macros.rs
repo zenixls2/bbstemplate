@@ -49,6 +49,31 @@ macro_rules! gen_command {
     };
 }
 
+pub const MOUSE_INIT_UTF8: [u8; 8] = [
+    // \x1b[?1005h
+    27, 91, 63, 49, 48, 48, 53, 104
+];
+
+pub const MOUSE_INIT_URXVT: [u8; 8] = [
+    // \x1b[?1015h
+    27, 91, 63, 49, 48, 49, 53, 104
+];
+
+pub const MOUSE_INIT_XTERM: [u8; 8] = [
+    // \x1b[?1006h
+    27, 91, 63, 49, 48, 48, 54, 104
+];
+
+pub const MOUSE_INIT_MOVEMENT: [u8; 8] = [
+    // \x1b[?1003h, enable movement, drag, drop reporting
+    27, 91, 63, 49, 48, 48, 51, 104
+];
+
+pub const MOUSE_END_MOVEMENT: [u8; 8] = [
+    // \x1b[?1003l, disable mouse movement events
+    27, 91, 63, 49, 48, 48, 51, 108
+];
+
 pub fn trueColorFg(r: u8, g: u8, b: u8) -> Box<[u8]> {
     // \x1b[38;2;{};{};{}m
     let mut out = Vec::with_capacity(19);
